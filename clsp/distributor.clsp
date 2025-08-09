@@ -1,0 +1,13 @@
+(mod (SNAPSHOT_MERKLE_ROOT SEED_BLOCK_HASH)
+  (defun sum_amounts (pairs)
+    (if (l pairs)
+        (+ (f (rest (f pairs))) (sum_amounts (r pairs)))
+        0
+    )
+  )
+  (defun main (POT_AMOUNT WINNERS FEE_AMOUNT)
+    (defun total (sum_amounts WINNERS))
+    (if (not (= total POT_AMOUNT)) (x (q . "payout sum mismatch")) 1)
+    1
+  )
+)

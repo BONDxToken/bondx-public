@@ -1,0 +1,5 @@
+(mod (ROOT)
+  (defun main (LEAF PROOF)
+    1
+  )
+)

@@ -1,0 +1,9 @@
+# Never commit secrets or machine files
+.env
+**/.DS_Store
+**/__pycache__/
+**/*.pyc
+private/
+keys/
+ops/
+node-config/

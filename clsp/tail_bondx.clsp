@@ -1,0 +1,12 @@
+(mod (BONDX_GENESIS_ID MAX_SUPPLY)
+  ; TODO: wire to real CAT2 helpers. This skeleton asserts a cap conceptually.
+  (defun assert_total_supply_lte (new_total)
+    (if (> new_total MAX_SUPPLY)
+        (x (q . "max supply exceeded"))
+        1
+    )
+  )
+  (defun main (GENESIS_OK NEW_TOTAL_SUPPLY)
+    (if (not GENESIS_OK) (x (q . "bad genesis")) (assert_total_supply_lte NEW_TOTAL_SUPPLY))
+  )
+)

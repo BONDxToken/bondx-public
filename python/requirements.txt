@@ -1,0 +1,2 @@
+# minimal verifier has no external deps
+# full ops tool (private) would use chia-blockchain RPC, blspy, etc.
