@@ -1,0 +1,279 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BONDx Simulator UI</title>
+  <style>
+    :root { --card: #f5f7fb; --ink: #0f172a; --muted: #64748b; --accent: #6d28d9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: var(--ink); background: #fff; }
+    header { padding: 20px; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; background: #fff; z-index: 10; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0; font-size: 22px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { background: var(--card); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .title { font-weight: 700; margin-bottom: 8px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .row { display: flex; align-items: center; gap: 12px; }
+    .btn { background: var(--accent); color: #fff; padding: 10px 14px; border: 0; border-radius: 12px; cursor: pointer; font-weight: 600; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+    th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .pill { padding: 2px 8px; border-radius: 999px; background: #ede9fe; color: #4c1d95; font-size: 12px; font-weight: 700; }
+    .legend { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .legend i { width: 10px; height: 10px; display: inline-block; border-radius: 2px; }
+    .chart { height: 180px; position: relative; }
+    canvas { width: 100%; height: 100%; }
+    .small { font-size: 12px; }
+    .kpi { font-size: 22px; font-weight: 800; }
+    .spacer { height: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row">
+      <h1>BONDx Simulator</h1>
+      <div style="flex:1"></div>
+      <button id="runOnce" class="btn">Run Draw</button>
+      <button id="run10" class="btn">Run 10 Epochs</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card" style="grid-column: span 4;">
+        <div class="title">Epoch</div>
+        <div class="kpi" id="epoch">0</div>
+        <div class="muted small">Current epoch number</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="title">Distribution Rate</div>
+        <div class="kpi">1% / epoch</div>
+        <div class="muted small">Of remaining supply</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="title">Remaining Supply</div>
+        <div class="kpi" id="remaining">20,000,000</div>
+        <div class="muted small">Tokens left for lottery</div>
+      </div>
+
+      <div class="card" style="grid-column: span 7;">
+        <div class="row" style="justify-content: space-between;">
+          <div class="title">Top 5 Winners (Last Draw)</div>
+          <span class="pill" id="drawPayout">–</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Winner</th>
+              <th>Generated Name</th>
+              <th>Prize</th>
+              <th>Weight %</th>
+            </tr>
+          </thead>
+          <tbody id="winnersBody">
+            <tr><td colspan="5" class="muted">Run a draw to populate…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="grid-column: span 5;">
+        <div class="title">Liquidity Deployment</div>
+        <div class="muted small">Visual split across LP1 / LP2 / Treasury / Dev</div>
+        <div class="chart"><canvas id="liqChart"></canvas></div>
+        <div class="legend">
+          <span><i style="background:#a78bfa"></i> LP1</span>
+          <span><i style="background:#60a5fa"></i> LP2</span>
+          <span><i style="background:#34d399"></i> Treasury</span>
+          <span><i style="background:#fbbf24"></i> Dev (1%/epoch)</span>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 12;">
+        <div class="row" style="justify-content: space-between;">
+          <div class="title">All Winners (Last Draw)</div>
+          <span class="muted small" id="winnersCount">0 of 100</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Address</th>
+              <th>Generated Name</th>
+              <th>Prize</th>
+              <th>Weight %</th>
+            </tr>
+          </thead>
+          <tbody id="allWinnersBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+// --- Config (align these with your simulator) ---
+const DRAW_WINNERS = 100;
+const START_SUPPLY = 20000000;
+const DISTRO_RATE = 0.01; // 1% of remaining per epoch
+const DEV_WALLET_RATE = 0.01; // 1% of LP1+LP2 XCH balance per epoch (display only)
+
+// Mock holder set for demo (replace with real input)
+const HOLDERS = Array.from({length: 1000}, (_,i)=> ({
+  address: "xch" + (100000 + i),
+  balance: Math.max(1, Math.floor( (Math.sin(i*12.9898)*43758.5453 % 1) * 10_000 ))
+}));
+
+let epoch = 0;
+let remaining = START_SUPPLY;
+
+// Load generated names to show next to winners
+let NAME_POOL = [];
+fetch("../sim_names.json")
+  .then(r => r.json())
+  .then(data => { NAME_POOL = data; })
+  .catch(()=>{
+    // fallback small pool
+    NAME_POOL = ["Mane Event","Neigh-sayer","Hoof Hearted","Stable Genius","Foal Play"];
+  });
+
+// Weighted pick by balance (ticket weight proportional to balance)
+function runDraw() {
+  epoch += 1;
+  const payout = Math.floor(remaining * DISTRO_RATE);
+  remaining -= payout;
+
+  // Build weighted index
+  let total = 0;
+  const prefix = [];
+  for (const h of HOLDERS) {
+    total += h.balance;
+    prefix.push(total);
+  }
+
+  const picked = new Map();
+  while (picked.size < DRAW_WINNERS) {
+    const r = Math.floor(Math.random() * total);
+    // binary search
+    let lo = 0, hi = prefix.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (r < prefix[mid]) hi = mid; else lo = mid + 1;
+    }
+    picked.set(lo, HOLDERS[lo]);
+  }
+
+  const perWinner = payout / DRAW_WINNERS;
+
+  // Render Top 5
+  const winners = Array.from(picked.values()).map((w,i)=>({
+    rank: i+1,
+    address: w.address,
+    prize: perWinner,
+    weight: (w.balance / total) * 100,
+    name: NAME_POOL[(epoch*DRAW_WINNERS + i) % NAME_POOL.length] || "Unnamed"
+  }));
+
+  const top5 = winners.slice(0,5);
+  const winnersBody = document.getElementById("winnersBody");
+  winnersBody.innerHTML = "";
+  top5.forEach((w,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${w.rank}</td>
+      <td><code>${w.address}</code></td>
+      <td>${w.name}</td>
+      <td>${w.prize.toLocaleString()}</td>
+      <td>${w.weight.toFixed(4)}%</td>`;
+    winnersBody.appendChild(tr);
+  });
+
+  // Render all 100
+  const allBody = document.getElementById("allWinnersBody");
+  allBody.innerHTML = "";
+  winners.forEach((w,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${w.rank}</td>
+      <td><code>${w.address}</code></td>
+      <td>${w.name}</td>
+      <td>${w.prize.toLocaleString()}</td>
+      <td>${w.weight.toFixed(4)}%</td>`;
+    allBody.appendChild(tr);
+  });
+
+  document.getElementById("winnersCount").textContent = `${winners.length} of ${DRAW_WINNERS}`;
+  document.getElementById("drawPayout").textContent = `${payout.toLocaleString()} tokens`;
+  document.getElementById("epoch").textContent = epoch.toLocaleString();
+  document.getElementById("remaining").textContent = remaining.toLocaleString();
+
+  drawLiquidityChart(epoch);
+}
+
+// Simple donut chart without external libs
+function drawLiquidityChart(step){
+  const canvas = document.getElementById("liqChart");
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr; ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0,0,w,h);
+
+  // Example allocation (adjust to match your logic)
+  const lp1 = 0.40 + 0.05*Math.sin(step/5);
+  const lp2 = 0.35 + 0.05*Math.cos(step/7);
+  const treasury = 1 - (lp1 + lp2) - 0.01; // leave 1% dev
+  const dev = 0.01;
+
+  const segments = [
+    {label:"LP1", value: Math.max(0, lp1), color:"#a78bfa"},
+    {label:"LP2", value: Math.max(0, lp2), color:"#60a5fa"},
+    {label:"Treasury", value: Math.max(0, treasury), color:"#34d399"},
+    {label:"Dev", value: dev, color:"#fbbf24"},
+  ];
+
+  const cx = w/2, cy = h/2, r = Math.min(w,h)/2 - 10;
+  const inner = r * 0.6;
+  let start = -Math.PI/2;
+  segments.forEach(seg=>{
+    const angle = seg.value * Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, start+angle);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+    start += angle;
+  });
+
+  // Cut out inner circle
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  // Center label
+  ctx.textAlign = "center";
+  ctx.font = "700 16px Inter, system-ui";
+  ctx.fillStyle = "#0f172a";
+  ctx.fillText("Liquidity", cx, cy-4);
+  ctx.font = "12px Inter, system-ui";
+  const lp1p = Math.round(segments[0].value*100);
+  const lp2p = Math.round(segments[1].value*100);
+  const trep = Math.round(segments[2].value*100);
+  ctx.fillText(`${lp1p}% / ${lp2p}% / ${trep}% / 1%`, cx, cy+14);
+}
+
+document.getElementById("runOnce").addEventListener("click", runDraw);
+document.getElementById("run10").addEventListener("click", ()=>{
+  for (let i=0;i<10;i++) runDraw();
+});
+
+// Initial render
+drawLiquidityChart(0);
+</script>
+</body>
+</html>
