@@ -1,0 +1,36 @@
+(mod (INNER_PUZZLE PRIZE_TOTAL WINNERS ASSERT_HEIGHT ABSORB_FEE)
+  ;; Skeleton CAT wrapper.
+  ;; Enforce:
+  ;;  - prize total equals sum of outputs
+  ;;  - optional assert for min block height (epoch gating)
+  ;;  - minimal fee absorbed
+
+  (defun sum-amounts (ws acc)
+    (if (l ws)
+        (sum-amounts (r ws) (+ acc (f (r (f ws))))) ; each item: (puzhash amount)
+        acc
+    )
+  )
+
+  (defun emit-payments (ws)
+    (if (l ws)
+        (c (list (q . CREATE_COIN) (f (f ws)) (f (r (f ws))))
+           (emit-payments (r ws)))
+        (q)
+    )
+  )
+
+  (defun main (INNER_PUZZLE PRIZE_TOTAL WINNERS ASSERT_HEIGHT ABSORB_FEE)
+    (defsum (sum-amounts WINNERS 0))
+    (if (!= defsum PRIZE_TOTAL) (x "prize mismatch") 1)
+
+    (defconds
+      (c (if ASSERT_HEIGHT (list (q . ASSERT_HEIGHT_ABSOLUTE) ASSERT_HEIGHT) (q))
+         (c (if (> ABSORB_FEE 0) (list (q . RESERVE_FEE) ABSORB_FEE) (q))
+            (emit-payments WINNERS)
+         )
+      )
+    )
+    (list (q . 1) defconds)
+  )
+)

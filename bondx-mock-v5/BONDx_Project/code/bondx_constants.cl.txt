@@ -1,0 +1,30 @@
+(mod ()
+  ;; ------------ BondX Constants (edit here) ------------
+  (defconstant MAX_SUPPLY            21000000)  ; total BONDx
+  (defconstant AIRDROP_SUPPLY        1000000)   ; epoch 0 airdrop
+  (defconstant EPOCH_PCT_BP          100)       ; 1% per epoch in basis points
+  (defconstant WINNERS_TOTAL         100)
+  (defconstant TIER_A_COUNT          1)
+  (defconstant TIER_A_BP             1000)      ; 10% (of epoch prize) in basis points
+  (defconstant TIER_B_COUNT          20)
+  (defconstant TIER_B_BP             5000)      ; 50%
+  (defconstant TIER_C_COUNT          79)
+  (defconstant TIER_C_BP             4000)      ; 40%
+  (defconstant ELIGIBILITY_DAYS      7)
+
+  ;; Reserved/known addresses (we’ll fill launch values later)
+  (defconstant LP1_HASH              0x00)      ; puzzle hash for LP1 address
+  (defconstant LP2_HASH              0x00)      ; puzzle hash for LP2 address
+
+  ;; Draw seed domain separation (preimage: sha256("BONDx|epoch|height|..."))
+  (defconstant SEED_DOMAIN_TAG       "BONDx-Draw-Seed")
+
+  ;; Height cadence (example weekly ~ 7*4608 ≈ 32256)
+  (defconstant BLOCKS_PER_EPOCH      32128)
+
+  ;; Fee safety (min mojos when spending prize)
+  (defconstant MIN_FEE               1)
+
+  ;; ------------------------------------------------------
+  (list MAX_SUPPLY)  ; prevent “unused” warnings in skeleton
+)
