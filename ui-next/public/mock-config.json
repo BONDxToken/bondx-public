@@ -1,0 +1,9 @@
+{
+  "HORSE_HUMOUR": true,
+  "LP_RULES": {
+    "upkeepPct": 0.01,
+    "sellCapPct": 0.3,
+    "splitTargetPct": 0.5,
+    "splitTolerance": 0.05
+  }
+}

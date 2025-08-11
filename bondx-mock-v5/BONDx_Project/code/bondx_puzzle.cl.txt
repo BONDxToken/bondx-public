@@ -1,0 +1,55 @@
+(mod (CURR_HEIGHT LAST_EPOCH REMAINING_SUPPLY
+      PARAM_BLOCKS_PER_EPOCH       ; 32128 default
+      DRAW_PROGRAM                 ; compiled bondx_draw.cl
+      DRAW_ARGS                    ; (AGG_SIG_ME ADDL_DATA EPOCH HEIGHT SEED_PREIMAGE WINNERS)
+      CAT_PAYOUT_PROGRAM           ; compiled bondx_cat.cl
+      MIN_FEE)
+
+  ;; Skeleton controller:
+  ;;  - check epoch boundary
+  ;;  - compute prize = 1% of remaining (floor)
+  ;;  - delegate to DRAW_PROGRAM to validate seed/winners
+  ;;  - pay winners via CAT_PAYOUT_PROGRAM
+  ;;  - update state (LAST_EPOCH+1, REMAINING_SUPPLY - prize)
+
+  (defun expect (cond msg) (if cond (q . 1) (x msg)))
+
+  (defun is-epoch-boundary (h last blocks)
+    ;; require h >= last+blocks and aligned enough
+    (>= h (+ last blocks))
+  )
+
+  (defun bp_to_amount (remaining bp)
+    (/ (* remaining bp) 10000)  ; basis points
+  )
+
+  (defun main (CURR_HEIGHT LAST_EPOCH REMAINING_SUPPLY
+                           PARAM_BLOCKS_PER_EPOCH DRAW_PROGRAM DRAW_ARGS
+                           CAT_PAYOUT_PROGRAM MIN_FEE)
+
+    (expect (> REMAINING_SUPPLY 0) "nothing left")
+    (expect (is-epoch-boundary CURR_HEIGHT LAST_EPOCH PARAM_BLOCKS_PER_EPOCH) "not epoch")
+
+    ;; prize = floor(1% of remaining)
+    (defprize (max 1 (bp_to_amount REMAINING_SUPPLY 100))) ; 100 bp = 1%
+    (defnext-supply (- REMAINING_SUPPLY defprize))
+
+    ;; Call DRAW program to validate seed/winners & return (seed winners)
+    (defdraw-res (a DRAW_PROGRAM DRAW_ARGS))
+    (defseed (f (r defdraw-res)))
+    (defwinners (r (r defdraw-res)))
+
+    ;; Hand the list to CAT payout program
+    (defpayout (a CAT_PAYOUT_PROGRAM (list (q . ()) defprize defwinners 0 MIN_FEE)))
+
+    ;; State transition example (for a singleton you’d coin-announce and recreate)
+    (defnew-last (+ LAST_EPOCH PARAM_BLOCKS_PER_EPOCH))
+
+    ;; Emit payments and assert min fee
+    (c (list (q . RESERVE_FEE) (if (> MIN_FEE 0) MIN_FEE 1))
+       (c (list (q . CREATE_COIN_ANNOUNCEMENT) defseed) ; example linkage
+          (r defpayout)                                  ; CAT payments
+       )
+    )
+  )
+)

@@ -1,0 +1,47 @@
+(mod (AGG_SIG_ME ADDITIONAL_DATA
+      CURR_EPOCH CURR_HEIGHT
+      SEED_PREIMAGE              ; e.g. [SEED_DOMAIN_TAG, CURR_EPOCH, CURR_HEIGHT, extra_entropy]
+      WINNERS)                   ; list of (puzhash amount) length ≤ 100
+
+  ;; Skeleton draw verifier.
+  ;; Goals:
+  ;;  - bind seed to (domain, epoch, height)
+  ;;  - basic shape checks on winners
+  ;;  - emit the same list as conditions to be used by parent puzzle
+
+  (include "chia/clvm/sha256.clib")
+
+  (defun sha256tree (x) (sha256 x)) ; placeholder
+
+  (defun expect-bool (cond msg)
+    (if cond (q . 1) (x msg))
+  )
+
+  ;; Very light checks for now:
+  (defun check-winners (ws)
+    (if (<= (len ws) (q . 100))
+      (q . 1)
+      (x "too many winners")
+    )
+  )
+
+  (defun compute-seed (preimage)
+    (sha256 (c (q . "BONDx-Draw-Seed") preimage))
+  )
+
+  (defun main
+    (AGG_SIG_ME ADDITIONAL_DATA CURR_EPOCH CURR_HEIGHT SEED_PREIMAGE WINNERS)
+
+    (expect-bool (check-winners WINNERS) "bad winners")
+
+    ;; Bind seed to epoch/height/domain
+    (defcomputed-seed (compute-seed (c CURR_EPOCH (c CURR_HEIGHT SEED_PREIMAGE))))
+    (a (q . sha256tree) (list))  ; silence warnings
+
+    ;; Return the tuple used by parent:
+    ;;   (seed winners)
+    (list (q . 1)
+          (list defcomputed-seed WINNERS)
+    )
+  )
+)

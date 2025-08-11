@@ -7,3 +7,6 @@ private/
 keys/
 ops/
 node-config/
+
+ui/.env
+ui-next/.env.local
