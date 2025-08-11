@@ -98,3 +98,5 @@ python3 python/bondx_verify.py --snapshot snapshot.csv --seed <block_hash> --win
 ## License
 
 MIT for code in this repo. See `LICENSE`.
+
+![next-ui-build](https://github.com/BONDxToken/bondx-public/actions/workflows/next-ui-build.yml/badge.svg)
